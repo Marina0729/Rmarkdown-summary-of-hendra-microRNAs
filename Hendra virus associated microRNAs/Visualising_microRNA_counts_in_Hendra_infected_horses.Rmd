@@ -61,7 +61,7 @@ My group are looking to find microRNAs that are predictive of viral infection. S
 I began with two tables, one a count matrix for each microRNA and the other a table containing metadata. 
 </br>
 </br>
-There are some challenging apsects to this data.
+Just be looking at these tables, there are some challenging apsects to this data.
 </br>
 * 800+ microRNAs
 </br>
@@ -100,9 +100,6 @@ knitr::kable(head(redlands_horse_metadata, n = 6 ), format = "html") %>%
 ```
 </div>
 
-## Data clean up
-I used tidyverse and edgeR packages to clean up my RNA-seq count data. After removing s6, we create what's called a DGEList where raw counts are converted to counts per million (CPM) to account for the different sample or library sizes.
-
 ```{r tidying data for plotting, out.width = '100%', echo = FALSE, results = 'hide'}
 redlands_horse_metadata_tidy <- redlands_horse_metadata %>% 
   mutate(day = sub("d","", condition )) %>%
@@ -120,8 +117,9 @@ lib_size <- microRNA_counts %>%
 
 mean(lib_size$counts_sum)
 ```
-
-```{r plotting library size, out.width = '50%', echo = FALSE }
+## Data clean up
+Plotting the total counts for each sample or library we see that they vary around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts. Raw counts, which we would like to use as a measure of microRNA expression will be higher for a microRNA in a sample with higher total counts. We can therefore convert the counts to counts per million (CPM) using the edgeR package. 
+```{r plotting library size, out.width = '50%', echo = FALSE, fig.align = 'left'}
 microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
   left_join(redlands_horse_metadata_tidy, by = "sample") %>% 
@@ -134,7 +132,11 @@ microRNA_counts %>%
   geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs( x = "sample", 
-        y = "Library size (millions)")
+        y = "Library size (million counts)") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"))
 ```
 
 ```{r creating a DGEList, out.width = '100%', echo = FALSE, results = 'hide'}
