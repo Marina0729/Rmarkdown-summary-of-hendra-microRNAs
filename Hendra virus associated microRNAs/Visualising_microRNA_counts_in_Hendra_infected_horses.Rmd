@@ -1,0 +1,154 @@
+---
+title: Mining the transcriptome for biomarkers of infection 
+subtitle: A call for larger sample sizes 
+author:  Marina Alexander
+affiliation: Health & Biosecurity| Managing invasive species and Disease
+photo: resources/img/Measles.jpg
+
+short_title: Optional short title
+
+output: DSreport::project_summary
+---
+```{r setup, include=FALSE}
+#Remind R where to look for libraries
+.libPaths(c("C:/Users/ale097/Data School/Packages"))
+#Load libraries
+library(tidyverse)
+library(gapminder)
+library(kableExtra)
+library(knitr)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+knitr::opts_chunk$set(
+  results = 'asis',
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = 'center'
+)
+
+```
+
+
+# Introduction
+Hi my name is Marina. I work on viruses. Before data school I would typically enter my data into Excel or Prism to make bar graphs with errors bars, then communicate these in publications and powerpoint slides. Using R, I can now reproducibly wrangle data imported from Excel, plot with ggplot2 to make really flexible and informative visualisations of the raw data. This has helped me to understand the sources of variation in my data, apply appropriate statistics and make novel visualisations.  
+
+# My Project
+My group are looking to find microRNAs that are predictive of viral infection. Such microRNAs could act as early bio-markers of infection. Allowing us to isolate the infected individual before they show signs of infection.  To identify these microRNAs we set up an experiment in which three horses were infected with Hendra virus and blood was taken at day 0, 1, 3, 5 and 7. RNA was extracted and sequenced, many millions of sequencing reads were then aligned to the 800+ currently defined microRNAs in the horse genome. This process generates a table where the number of aligned reads for each microRNA are counted for each sample. My goal was to model a relationship between microRNA expression level and time since infection using multi-linear regression.
+
+<style>
+.column-left{
+  float: left;
+  width: 20%;
+  text-align: left;
+}
+.column-center{
+  display: inline-block;
+  width: 60%;
+  text-align: center;
+}
+.column-right{
+  float: right;
+  width: 20%;
+  text-align: right;
+}
+</style>
+
+<div class="column-left">
+
+I began with two tables, one a count matrix for each microRNA and the other a table containing metadata shown here. 
+
+</div>
+
+<div class="column-center">
+```{r reading_in_data, out.width='100%', echo = FALSE, results ='hide'}
+read_csv("data/Redlands_counts.csv")   
+microRNA_counts <- read_csv("data/Redlands_counts.csv")
+```
+
+Table 1. microRNA counts
+```{r counts_table, out.width='100%', echo = FALSE}
+knitr::kable(head(microRNA_counts[1:8], n = 5), format = "html") %>% 
+  kable_styling("striped", full_width = FALSE)
+
+```
+
+</div>
+
+<div class="column-right">
+```{r reading_in_metadata, out.width = '100%', echo = FALSE, results = 'hide'}
+read_csv("data/redlands_horse_metadata.csv")                            
+redlands_horse_metadata <- read_csv("data/redlands_horse_metadata.csv")
+```
+Table 2. Metadata
+```{r metadata_table, out.width = '100%', echo = FALSE}
+
+knitr::kable(head(redlands_horse_metadata, n = 5 ), format = "html") %>% 
+  kable_styling("striped", full_width = FALSE)
+
+```
+</div>
+
+
+## Preliminary results
+
+This section will demonstrate the different visuals you might want use to show off your 
+project. Don't feel the need to go overboard, this is supposed to give a taste of the work you are
+doing rather than being a publication ready document.
+
+
+**Tables**
+```{r mytable, out.width='100%', echo = T}
+knitr::kable(head(gapminder, n = 5), format = "html", caption = "A table of data") %>% 
+  kable_styling("striped")
+```
+
+**Images from a file**
+
+![](resources/img/tidyverse.png){width=100px}
+
+**Plots from R**
+```{r standard-plot, out.width='60%', fig.align='center', fig.height= 4, fig.width=6, fig.cap="Yet another gapminder plot"}
+
+```
+
+Your figure and table captions are automatically numbered and can be referenced in the text
+if needed: see eg. Table \@ref(tab:mytable) and Figure \@ref(fig:standard-plot)
+
+# My Digital Toolbox
+
+What digital tools have you been using in your project? Which ones have you learned since starting 
+Data School?
+
+You can use all the usual R markdown features in writing a project summary, including lists:
+
+* R - dplyr, ggplot, ...
+* Python
+* SQL
+
+## Favourite tool (optional)
+
+Is there a tool/package/function in particular that you've enjoyed using? Give it a special shout out here.
+
+![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){.pull-right width=100px}
+
+No prizes for guessing mine:
+
+# My time went ...
+
+What parts of the project took the most time and effort? Were there any surprising challenges you
+encountered, and how did you solve them?
+
+# Next steps
+
+What further steps do you wish your project could take? Or are there any new digital skills that you
+are keen to develop as a result of your involvement in the Data School?
+
+# My Data School Experience
+
+This poster is mostly about your synthesis project. However we would also like to hear about other
+parts of your Data School experience. What aspects of the program did you really enjoy? How have you
+been applying the skills you have learned in your daily work? Have you been able to transfer this 
+knowledge to your team members? Concrete examples demonstrating this would be useful here
+(meetings/talks/collaborations/new roles). Any descriptions of the personal impact the program has 
+had are welcome here as well!
