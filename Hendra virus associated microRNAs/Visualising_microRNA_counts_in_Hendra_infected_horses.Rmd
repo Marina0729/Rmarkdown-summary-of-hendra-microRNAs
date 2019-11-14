@@ -17,6 +17,8 @@ library(tidyverse)
 library(gapminder)
 library(kableExtra)
 library(knitr)
+library(edgeR)
+library(limma)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
@@ -39,7 +41,7 @@ My group are looking to find microRNAs that are predictive of viral infection. S
 <style>
 .column-left{
   float: left;
-  width: 20%;
+  width: 25%;
   text-align: left;
 }
 .column-center{
@@ -49,15 +51,25 @@ My group are looking to find microRNAs that are predictive of viral infection. S
 }
 .column-right{
   float: right;
-  width: 20%;
+  width: 15%;
   text-align: right;
 }
 </style>
 
 <div class="column-left">
-
-I began with two tables, one a count matrix for each microRNA and the other a table containing metadata shown here. 
-
+</br>
+I began with two tables, one a count matrix for each microRNA and the other a table containing metadata. 
+</br>
+</br>
+There are some challenging apsects to this data.
+</br>
+* 800+ microRNAs
+</br>
+* microRNAs with zero counts
+</br>
+* Sample 6 did not work 
+</br>
+* High dynamic range of counts 
 </div>
 
 <div class="column-center">
@@ -66,13 +78,12 @@ read_csv("data/Redlands_counts.csv")
 microRNA_counts <- read_csv("data/Redlands_counts.csv")
 ```
 
-Table 1. microRNA counts
+Snippet of microRNA counts
 ```{r counts_table, out.width='100%', echo = FALSE}
-knitr::kable(head(microRNA_counts[1:8], n = 5), format = "html") %>% 
+knitr::kable(head(microRNA_counts[1:8], n =6), format = "html") %>% 
   kable_styling("striped", full_width = FALSE)
 
 ```
-
 </div>
 
 <div class="column-right">
@@ -80,40 +91,77 @@ knitr::kable(head(microRNA_counts[1:8], n = 5), format = "html") %>%
 read_csv("data/redlands_horse_metadata.csv")                            
 redlands_horse_metadata <- read_csv("data/redlands_horse_metadata.csv")
 ```
-Table 2. Metadata
+Snippet of metadata
 ```{r metadata_table, out.width = '100%', echo = FALSE}
 
-knitr::kable(head(redlands_horse_metadata, n = 5 ), format = "html") %>% 
+knitr::kable(head(redlands_horse_metadata, n = 6 ), format = "html") %>% 
   kable_styling("striped", full_width = FALSE)
 
 ```
 </div>
 
+## Data clean up
+I used tidyverse and edgeR packages to clean up my RNA-seq count data. After removing s6, we create what's called a DGEList where raw counts are converted to counts per million (CPM) to account for the different sample or library sizes.
 
-## Preliminary results
+```{r tidying data for plotting, out.width = '100%', echo = FALSE, results = 'hide'}
+redlands_horse_metadata_tidy <- redlands_horse_metadata %>% 
+  mutate(day = sub("d","", condition )) %>%
+  mutate(day = as.numeric(day)) %>%
+  select(-condition) 
 
-This section will demonstrate the different visuals you might want use to show off your 
-project. Don't feel the need to go overboard, this is supposed to give a taste of the work you are
-doing rather than being a publication ready document.
+lib_size <- microRNA_counts %>%
+  gather(sample, counts, -gene) %>% 
+  left_join(redlands_horse_metadata_tidy, by = "sample") %>% 
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>% 
+  mutate(counts_million = counts/1000000) %>% 
+  group_by(library) %>% 
+  summarise(counts_sum = sum(counts_million))
+
+mean(lib_size$counts_sum)
+```
+
+```{r plotting library size, out.width = '50%', echo = FALSE }
+microRNA_counts %>%
+  gather(sample, counts, -gene) %>% 
+  left_join(redlands_horse_metadata_tidy, by = "sample") %>% 
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>%
+  mutate(counts_million = counts/1000000) %>% 
+  full_join(lib_size, by = "library") %>%
+  ggplot(aes(y = counts_sum, x = library, color = day, shape = animal)) +
+  geom_point(size = 5) +
+  geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
+  scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  labs( x = "sample", 
+        y = "Library size (millions)")
+```
+
+```{r creating a DGEList, out.width = '100%', echo = FALSE, results = 'hide'}
+microRNA_counts_s6 <- microRNA_counts %>% 
+  select(-s6)
+
+redlands_horse_metadata_s6 <- redlands_horse_metadata %>% 
+  filter(sample != "s6")
+
+horse_counts <- DGEList(counts = microRNA_counts_s6[, -1], genes = microRNA_counts_s6[, 1], samples = redlands_horse_metadata_s6)
+```
+
+```{r filtering lowly expressed genes, out.width = '100%', echo = FALSE, results = 'hide'}
+design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata)
+
+gene_filter <- filterByExpr(horse_counts, min.count = 0.5, min.total.count = 20, design = design_matrix)
+
+horse_filtered <- horse_counts[gene_filter, , keep.lib.sizes = FALSE]
+
+horse_filtered
+```
+
 
 
 **Tables**
-```{r mytable, out.width='100%', echo = T}
-knitr::kable(head(gapminder, n = 5), format = "html", caption = "A table of data") %>% 
-  kable_styling("striped")
-```
-
+I wanted to perform PCA on these samples to identify samples with similar expression profiles. Do the horses differ significantly? 
 **Images from a file**
-
-![](resources/img/tidyverse.png){width=100px}
-
-**Plots from R**
-```{r standard-plot, out.width='60%', fig.align='center', fig.height= 4, fig.width=6, fig.cap="Yet another gapminder plot"}
-
-```
-
-Your figure and table captions are automatically numbered and can be referenced in the text
-if needed: see eg. Table \@ref(tab:mytable) and Figure \@ref(fig:standard-plot)
 
 # My Digital Toolbox
 
@@ -126,11 +174,25 @@ You can use all the usual R markdown features in writing a project summary, incl
 * Python
 * SQL
 
+![](resources/img/tidyverse.png){width=100px}
+![](resources/img/edgeR.png){width=270px}
+![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){.pull-right width=100px}
+
+**Plots from R**
+```{r standard-plot, out.width='60%', fig.align='center', fig.height= 4, fig.width=6, fig.cap="Yet another gapminder plot"}
+
+```
+
+Your figure and table captions are automatically numbered and can be referenced in the text
+if needed: see eg. Table \@ref(tab:mytable) and Figure \@ref(fig:standard-plot)
+
+
+
 ## Favourite tool (optional)
 
 Is there a tool/package/function in particular that you've enjoyed using? Give it a special shout out here.
 
-![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){.pull-right width=100px}
+
 
 No prizes for guessing mine:
 
