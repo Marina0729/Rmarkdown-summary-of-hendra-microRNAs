@@ -7,7 +7,9 @@ photo: resources/img/Measles.jpg
 
 short_title: Optional short title
 
-output: DSreport::project_summary
+output: 
+  DSreport::project_summary:
+    code_folding: hide
 ---
 ```{r setup, include=FALSE}
 #Remind R where to look for libraries
@@ -23,11 +25,15 @@ library(limma)
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
   results = 'asis',
-  echo = FALSE,
   warning = FALSE,
   message = FALSE,
   fig.align = 'center'
 )
+
+read_csv("data/Redlands_counts.csv")   
+microRNA_counts <- read_csv("data/Redlands_counts.csv")
+read_csv("data/redlands_horse_metadata.csv")                            
+redlands_horse_metadata <- read_csv("data/redlands_horse_metadata.csv")
 
 ```
 
@@ -71,26 +77,15 @@ Just be looking at these tables, there are some challenging apsects to this data
 </br>
 * High dynamic range of counts 
 </div>
-
 <div class="column-center">
-```{r reading_in_data, out.width='100%', echo = FALSE, results ='hide'}
-read_csv("data/Redlands_counts.csv")   
-microRNA_counts <- read_csv("data/Redlands_counts.csv")
-```
-
 Snippet of microRNA counts
 ```{r counts_table, out.width='100%', echo = FALSE}
-knitr::kable(head(microRNA_counts[1:8], n =6), format = "html") %>% 
+knitr::kable(head(microRNA_counts[1:7], n =6), format = "html") %>% 
   kable_styling("striped", full_width = FALSE)
 
 ```
 </div>
-
 <div class="column-right">
-```{r reading_in_metadata, out.width = '100%', echo = FALSE, results = 'hide'}
-read_csv("data/redlands_horse_metadata.csv")                            
-redlands_horse_metadata <- read_csv("data/redlands_horse_metadata.csv")
-```
 Snippet of metadata
 ```{r metadata_table, out.width = '100%', echo = FALSE}
 
@@ -99,16 +94,15 @@ knitr::kable(head(redlands_horse_metadata, n = 6 ), format = "html") %>%
 
 ```
 </div>
-
-```{r tidying data for plotting, out.width = '100%', echo = FALSE, results = 'hide'}
-redlands_horse_metadata_tidy <- redlands_horse_metadata %>% 
+```{r tidying data for plotting, out.width = '100%', results = 'hide', echo=FALSE}
+redlands_horse_metadata_long <- redlands_horse_metadata %>% 
   mutate(day = sub("d","", condition )) %>%
   mutate(day = as.numeric(day)) %>%
   select(-condition) 
 
 lib_size <- microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
-  left_join(redlands_horse_metadata_tidy, by = "sample") %>% 
+  left_join(redlands_horse_metadata_long, by = "sample") %>% 
   rename(library = sample) %>% 
   mutate(library = sub("s","", library)) %>% 
   mutate(counts_million = counts/1000000) %>% 
@@ -118,28 +112,32 @@ lib_size <- microRNA_counts %>%
 mean(lib_size$counts_sum)
 ```
 ## Data clean up
-Plotting the total counts for each sample or library we see that they vary around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts. Raw counts, which we would like to use as a measure of microRNA expression will be higher for a microRNA in a sample with higher total counts. We can therefore convert the counts to counts per million (CPM) using the edgeR package. 
-```{r plotting library size, out.width = '50%', echo = FALSE, fig.align = 'left'}
-microRNA_counts %>%
+Plotting the total counts for each sample or library (Figure 1) we see that they vary around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts. Raw counts, which we would like to use as a measure of microRNA expression, will be higher for a microRNA in a sample with higher total counts.
+```{r plotting library size, out.width = '50%', fig.align = 'left'}
+
+counts_to_plot <- microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
-  left_join(redlands_horse_metadata_tidy, by = "sample") %>% 
+  left_join(redlands_horse_metadata_long, by = "sample") %>% 
   rename(library = sample) %>% 
   mutate(library = sub("s","", library)) %>%
   mutate(counts_million = counts/1000000) %>% 
-  full_join(lib_size, by = "library") %>%
-  ggplot(aes(y = counts_sum, x = library, color = day, shape = animal)) +
+  full_join(lib_size, by = "library")
+  
+ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = animal)) +
   geom_point(size = 5) +
   geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
-  labs( x = "sample", 
-        y = "Library size (million counts)") +
+  labs( x = "Library", 
+        y = "Library size (million counts)", 
+        title = "Figure 1") +
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14, face = "bold"))
+        legend.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
 ```
-
-```{r creating a DGEList, out.width = '100%', echo = FALSE, results = 'hide'}
+We can convert the raw counts to counts per million (CPM) using the edgeR package after removing sample 6.
+```{r creating a DGEList, out.width = '100%', results = 'hide'}
 microRNA_counts_s6 <- microRNA_counts %>% 
   select(-s6)
 
@@ -147,9 +145,46 @@ redlands_horse_metadata_s6 <- redlands_horse_metadata %>%
   filter(sample != "s6")
 
 horse_counts <- DGEList(counts = microRNA_counts_s6[, -1], genes = microRNA_counts_s6[, 1], samples = redlands_horse_metadata_s6)
+
+cpm_long <- cpm(horse_counts) %>% 
+  as.tibble() %>%
+  bind_cols(as.tibble(horse_counts$genes)) %>%
+  gather(sample, cpm, -gene)
+  
+redlands_horse_metadata_s6_long <- 
+  redlands_horse_metadata_long %>% 
+  filter(sample != "s6")
+
+counts_cpm_to_plot <- microRNA_counts_s6 %>%
+  gather(sample, counts, -gene) %>% 
+  left_join(redlands_horse_metadata_s6_long, by = "sample") %>%
+  bind_cols(cpm_long) %>%
+  select(-sample1, -gene1) %>% 
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>%
+  mutate(counts_million = counts/1000000) %>% 
+  full_join(lib_size, by = "library")
+
+ggplot(counts_cpm_to_plot, aes(x = cpm, color = library)) +
+  geom_density() +
+  scale_x_log10()
+  
+  
+  geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
+  scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  labs( x = "Library", 
+        y = "Library size (million counts)", 
+        title = "Figure 1") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
+
+
 ```
 
-```{r filtering lowly expressed genes, out.width = '100%', echo = FALSE, results = 'hide'}
+```{r filtering lowly expressed genes, out.width = '100%', results = 'hide'}
 design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata)
 
 gene_filter <- filterByExpr(horse_counts, min.count = 0.5, min.total.count = 20, design = design_matrix)
