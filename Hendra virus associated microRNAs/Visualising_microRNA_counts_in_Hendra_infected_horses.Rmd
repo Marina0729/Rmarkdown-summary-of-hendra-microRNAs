@@ -262,21 +262,16 @@ norm_cpm <- norm_cpm_long %>%
 
 plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library)) +
   geom_boxplot() +
-  scale_x_discrete(
-    limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14) ) +
   labs(title = "Unnormalised",
        y = "log-cpm")
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
         title = element_text(size = 14, face = "bold"))
 
-
 plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library)) +
   geom_boxplot() +
-  scale_x_discrete(
-    limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14)) +
-  labs(title = "Normalised",
-       y = "") +
+  labs(title = "Unnormalised",
+       y = "log-cpm")
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
         title = element_text(size = 14, face = "bold"))
