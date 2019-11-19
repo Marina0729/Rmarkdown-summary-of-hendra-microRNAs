@@ -111,14 +111,14 @@ lib_size <- microRNA_counts %>%
   group_by(library) %>% 
   summarise(counts_sum = sum(counts_million))
 
-lib_size %>% 
+median <- lib_size %>% 
   filter(library != 6) %>%
   summarise(median = median(counts_sum))
 
 ```
 ## Data clean up
-Plotting the total counts for each sample or library (Figure 1) we see that they vary considerably around the median for this experiment (excluding sample 6, `r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
-```{r plotting library size, out.width = '50%', fig.align = 'left'}
+Plotting the total counts for each sample or library we see that they vary considerably around the median for this experiment (`r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
+```{r plotting library size, out.width = '60%', fig.align = 'center'}
 
 counts_to_plot <- microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
@@ -143,8 +143,9 @@ ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = ani
 
 ```
 
+We can convert the raw counts to counts per million (CPM) using the `edgeR` package after removing sample 6. Then we filter the lowly expressed microRNAs,  The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this dataset I kept microRNAs with less than 5 cpm in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples. Shown here is a density plot of log transformed counts before and after filtering, where the red dahsed line represents the 5 cpm cut off chosen for this dataset. 
 
-```{r filtering out lowly expressed genes, out.width = '50%', fig.align = 'right'}
+```{r filtering out lowly expressed genes, out.width = '60%', fig.align = 'center'}
 #creating a DGEList with counts per million after removing s6
 microRNA_counts_s6 <- microRNA_counts %>% 
   select(-s6)
@@ -175,8 +176,11 @@ counts_cpm <- microRNA_counts_s6 %>%
   full_join(lib_size, by = "library") %>% 
   mutate(log_cpm = log(cpm))
 
+min_count <- 10/median
+
 plot_raw <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
   geom_density() +
+  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") +
   scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Unfiltered microRNAs",
        x = "log-cpm") +
@@ -209,6 +213,7 @@ filtered_cpm <- filtered_cpm_long %>%
 
 plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
   geom_density() +
+  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") +
   scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Filtered microRNAs",
        x = "log-cpm",
@@ -236,13 +241,52 @@ plot_grid(plots, legend, rel_widths = c(3, .4))
 
 ```
 
-We can convert the raw counts to counts per million (CPM) using the edgeR package after removing sample 6. Then we filter the lowly expressed microRNAs, leaving 
-`r nrow(horse_counts$genes)` from the original `r nrow(horse_filtered$genes)`. The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this dataset I kept microRNAs with less than 5 cpm (10/median library size) in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples.     
+We are left with `r nrow(horse_filtered$genes)` from the original `r nrow(horse_counts$genes)` and now need to perform normalisation. It is assumed that all samples should have a similar range and distribution of expression values. However, during the sample preparation or sequencing process, external factors that are not of biological interest can affect the expression of individual samples. Normalisation is required to ensure that the expression distributions of each sample are similar across the entire experiment. edgeR employs the Trimmed Means of M values (TMM) in which highly expressed genes and those that have a large variation of expression are excluded, whereupon a weighted average of the subset of genes is used to calculate a normalization factor.
+
+```{r TMM normalisation, out.width = '70%', fig.align = 'center'}
+
+horse_norm <- calcNormFactors(horse_filtered, method = "TMM")
+
+norm_cpm_long <- cpm(horse_norm) %>% 
+  as.tibble() %>%
+  bind_cols(as.tibble(horse_norm$genes)) %>%
+  gather(sample, norm_cpm, -gene)
+
+norm_cpm <- norm_cpm_long %>% 
+  left_join(cpm_long) %>% 
+  left_join(redlands_horse_metadata_s6_long) %>%
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>% 
+  mutate(log_cpm = log(cpm)) %>% 
+  mutate(log_norm_cpm = log(norm_cpm))
+
+plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library)) +
+  geom_boxplot() +
+  scale_x_discrete(
+    limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14) ) +
+  labs(title = "Unnormalised",
+       y = "log-cpm")
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
 
 
-**Tables**
-I wanted to perform PCA on these samples to identify samples with similar expression profiles. Do the horses differ significantly? 
-**Images from a file**
+plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library)) +
+  geom_boxplot() +
+  scale_x_discrete(
+    limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14)) +
+  labs(title = "Normalised",
+       y = "") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
+
+plot_grid(plot_unnorm, plot_norm)
+
+```
+
+EdgeR uses the negative binomial distribution to deal with count variability when performing multi linear regression. But forst let's do some quality control by performing principle component analysis.  
+
 
 # My Digital Toolbox
 
@@ -251,24 +295,11 @@ Data School?
 
 You can use all the usual R markdown features in writing a project summary, including lists:
 
-* R - dplyr, ggplot, ...
-* Python
-* SQL
+* R - dplyr, tidyverse, ggplot,
 
 ![](resources/img/tidyverse.png){width=100px}
 ![](resources/img/edgeR.png){width=270px}
 ![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){.pull-right width=100px}
-
-**Plots from R**
-```{r standard-plot, out.width='60%', fig.align='center', fig.height= 4, fig.width=6, fig.cap="Yet another gapminder plot"}
-
-```
-
-Your figure and table captions are automatically numbered and can be referenced in the text
-if needed: see eg. Table \@ref(tab:mytable) and Figure \@ref(fig:standard-plot)
-
-
-
 ## Favourite tool (optional)
 
 Is there a tool/package/function in particular that you've enjoyed using? Give it a special shout out here.
