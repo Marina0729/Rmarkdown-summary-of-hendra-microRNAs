@@ -21,6 +21,8 @@ library(kableExtra)
 library(knitr)
 library(edgeR)
 library(limma)
+library(cowplot)
+library(rlang)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
@@ -112,7 +114,7 @@ lib_size <- microRNA_counts %>%
 mean(lib_size$counts_sum)
 ```
 ## Data clean up
-Plotting the total counts for each sample or library (Figure 1) we see that they vary around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts. Raw counts, which we would like to use as a measure of microRNA expression, will be higher for a microRNA in a sample with higher total counts.
+Plotting the total counts for each sample or library (Figure 1) we see that they vary considerably around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts shown by the red dashed line. To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
 ```{r plotting library size, out.width = '50%', fig.align = 'left'}
 
 counts_to_plot <- microRNA_counts %>%
@@ -129,15 +131,18 @@ ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = ani
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs( x = "Library", 
         y = "Library size (million counts)", 
-        title = "Figure 1") +
+        title = "Library sizes") +
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
         title = element_text(size = 14, face = "bold"))
+
 ```
-We can convert the raw counts to counts per million (CPM) using the edgeR package after removing sample 6.
-```{r creating a DGEList, out.width = '100%', results = 'hide'}
+
+
+```{r filtering out lowly expressed genes, out.width = '50%', fig.align = 'right'}
+#creating a DGEList with counts per million after removing s6
 microRNA_counts_s6 <- microRNA_counts %>% 
   select(-s6)
 
@@ -146,6 +151,7 @@ redlands_horse_metadata_s6 <- redlands_horse_metadata %>%
 
 horse_counts <- DGEList(counts = microRNA_counts_s6[, -1], genes = microRNA_counts_s6[, 1], samples = redlands_horse_metadata_s6)
 
+# tidying for plotting
 cpm_long <- cpm(horse_counts) %>% 
   as.tibble() %>%
   bind_cols(as.tibble(horse_counts$genes)) %>%
@@ -155,7 +161,7 @@ redlands_horse_metadata_s6_long <-
   redlands_horse_metadata_long %>% 
   filter(sample != "s6")
 
-counts_cpm_to_plot <- microRNA_counts_s6 %>%
+counts_cpm <- microRNA_counts_s6 %>%
   gather(sample, counts, -gene) %>% 
   left_join(redlands_horse_metadata_s6_long, by = "sample") %>%
   bind_cols(cpm_long) %>%
@@ -163,37 +169,62 @@ counts_cpm_to_plot <- microRNA_counts_s6 %>%
   rename(library = sample) %>% 
   mutate(library = sub("s","", library)) %>%
   mutate(counts_million = counts/1000000) %>% 
-  full_join(lib_size, by = "library")
+  full_join(lib_size, by = "library") %>% 
+  mutate(log_cpm = log(cpm))
 
-ggplot(counts_cpm_to_plot, aes(x = cpm, color = library)) +
+plot_raw <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
   geom_density() +
-  scale_x_log10()
-  
-  
-  geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
-  scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
-  labs( x = "Library", 
-        y = "Library size (million counts)", 
-        title = "Figure 1") +
+  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  labs(title = "Unfiltered microRNAs",
+       x = "log-cpm") +
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
-        title = element_text(size = 14, face = "bold"))
+        title = element_text(size = 14, face = "bold"),
+        legend.position = "none")
 
-
-```
-
-```{r filtering lowly expressed genes, out.width = '100%', results = 'hide'}
+# filtering lowly expressed genes
 design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata)
 
-gene_filter <- filterByExpr(horse_counts, min.count = 0.5, min.total.count = 20, design = design_matrix)
+gene_filter <- filterByExpr(horse_counts, min.count = 10, min.total.count = 50, design = design_matrix)
 
 horse_filtered <- horse_counts[gene_filter, , keep.lib.sizes = FALSE]
 
-horse_filtered
+# tidying for plotting
+filtered_cpm_long <- cpm(horse_filtered) %>% 
+  as.tibble() %>%
+  bind_cols(as.tibble(horse_filtered$genes)) %>%
+  gather(sample, cpm, -gene)
+
+filtered_cpm <- filtered_cpm_long %>% 
+  left_join(cpm_long) %>% 
+  left_join(redlands_horse_metadata_s6_long) %>%
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>% 
+  mutate(log_filtered_cpm = log(cpm))
+
+plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
+  geom_density() +
+  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  labs(title = "Filtered microRNAs",
+       x = "log-cpm",
+       y = "") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"),
+        legend.position = "none")
+
+
+
+plot_grid(plot_raw, plot_filtered)
+
 ```
 
+We can convert the raw counts to counts per million (CPM) using the edgeR package after removing sample 6. Then we filter the lowly expressed microRNAs, leaving 
+`r nrow(horse_counts$genes)` from the original `r nrow(horse_filtered$genes)`. 
 
 
 **Tables**
