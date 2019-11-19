@@ -111,10 +111,13 @@ lib_size <- microRNA_counts %>%
   group_by(library) %>% 
   summarise(counts_sum = sum(counts_million))
 
-mean(lib_size$counts_sum)
+lib_size %>% 
+  filter(library != 6) %>%
+  summarise(median = median(counts_sum))
+
 ```
 ## Data clean up
-Plotting the total counts for each sample or library (Figure 1) we see that they vary considerably around the mean for this experiment, `r mean(lib_size$counts_sum)`million counts shown by the red dashed line. To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
+Plotting the total counts for each sample or library (Figure 1) we see that they vary considerably around the median for this experiment (excluding sample 6, `r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
 ```{r plotting library size, out.width = '50%', fig.align = 'left'}
 
 counts_to_plot <- microRNA_counts %>%
@@ -127,7 +130,7 @@ counts_to_plot <- microRNA_counts %>%
   
 ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = animal)) +
   geom_point(size = 5) +
-  geom_hline(yintercept=1.661439, linetype="dashed", color = "red") +
+  geom_hline(yintercept=1.808277, linetype="dashed", color = "red") +
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs( x = "Library", 
         y = "Library size (million counts)", 
@@ -174,7 +177,7 @@ counts_cpm <- microRNA_counts_s6 %>%
 
 plot_raw <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
   geom_density() +
-  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Unfiltered microRNAs",
        x = "log-cpm") +
   theme(axis.text = element_text(size = 12),
@@ -182,12 +185,12 @@ plot_raw <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
         title = element_text(size = 14, face = "bold"),
-        legend.position = "none")
+        plot.margin = margin(6, 0, 6, 0))
 
 # filtering lowly expressed genes
 design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata)
 
-gene_filter <- filterByExpr(horse_counts, min.count = 10, min.total.count = 50, design = design_matrix)
+gene_filter <- filterByExpr(horse_counts, min.count = 6, min.total.count = 80, design = design_matrix)
 
 horse_filtered <- horse_counts[gene_filter, , keep.lib.sizes = FALSE]
 
@@ -206,7 +209,7 @@ filtered_cpm <- filtered_cpm_long %>%
 
 plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
   geom_density() +
-  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Filtered microRNAs",
        x = "log-cpm",
        y = "") +
@@ -215,16 +218,26 @@ plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14, face = "bold"),
         title = element_text(size = 14, face = "bold"),
-        legend.position = "none")
+        plot.margin = margin(6, 0, 6, 0))
 
 
+plots <- plot_grid(
+  plot_raw + theme(legend.position="none"),
+  plot_filtered + theme(legend.position="none"),
+  hjust = -1,
+  nrow = 1
+)
 
-plot_grid(plot_raw, plot_filtered)
+legend <- get_legend(
+  plot_raw + theme(legend.box.margin = margin(0, 0, 0, 6))
+)
+
+plot_grid(plots, legend, rel_widths = c(3, .4))
 
 ```
 
 We can convert the raw counts to counts per million (CPM) using the edgeR package after removing sample 6. Then we filter the lowly expressed microRNAs, leaving 
-`r nrow(horse_counts$genes)` from the original `r nrow(horse_filtered$genes)`. 
+`r nrow(horse_counts$genes)` from the original `r nrow(horse_filtered$genes)`. The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this dataset I kept microRNAs with less than 5 cpm (10/median library size) in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples.     
 
 
 **Tables**
