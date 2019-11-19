@@ -270,7 +270,7 @@ plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library)) +
 
 plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library)) +
   geom_boxplot() +
-  labs(title = "Unnormalised",
+  labs(title = "Normalised",
        y = "log-cpm")
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14, face = "bold"),
