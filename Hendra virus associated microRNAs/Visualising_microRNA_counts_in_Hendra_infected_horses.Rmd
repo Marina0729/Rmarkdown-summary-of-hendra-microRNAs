@@ -1,6 +1,6 @@
 ---
 title: Mining the transcriptome for biomarkers of infection 
-subtitle: A call for larger sample sizes 
+subtitle: A play with microRNA count data 
 author:  Marina Alexander
 affiliation: Health & Biosecurity| Managing invasive species and Disease
 photo: resources/img/Measles.jpg
@@ -41,10 +41,10 @@ redlands_horse_metadata <- read_csv("data/redlands_horse_metadata.csv")
 
 
 # Introduction
-Hi my name is Marina. I work on viruses. Before data school I would typically enter my data into Excel or Prism to make bar graphs with errors bars, then communicate these in publications and powerpoint slides. Using R, I can now reproducibly wrangle data imported from Excel, plot with ggplot2 to make really flexible and informative visualisations of the raw data. This has helped me to understand the sources of variation in my data, apply appropriate statistics and make novel visualisations.  
+I'm Marina and I work on viruses. Before data school I would typically enter my data into Excel or Prism to make bar graphs with errors bars, then communicate these in publications and powerpoint slides. Using R, I can now reproducibly wrangle data imported from Excel, plot with ggplot2 to make really flexible and informative visualizations of the raw data. This has helped me to understand the sources of variation in my data, apply appropriate statistics and make novel visualizations.  
 
 # My Project
-My group are looking to find microRNAs that are predictive of viral infection. Such microRNAs could act as early bio-markers of infection. Allowing us to isolate the infected individual before they show signs of infection.  To identify these microRNAs we set up an experiment in which three horses were infected with Hendra virus and blood was taken at day 0, 1, 3, 5 and 7. RNA was extracted and sequenced, many millions of sequencing reads were then aligned to the 800+ currently defined microRNAs in the horse genome. This process generates a table where the number of aligned reads for each microRNA are counted for each sample. My goal was to model a relationship between microRNA expression level and time since infection using multi-linear regression.
+My group are looking to find microRNAs that are predictive of viral infection. Such microRNAs could act as early bio-markers of infection. Allowing us to isolate the infected individual before they show signs of infection.  To find such microRNAs, we set up an experiment in which three horses were infected with Hendra virus and blood was taken at day 0, 1, 3, 5 and 7. RNA was extracted and sequenced, many millions of sequencing reads were then aligned to the 800+ currently annotated microRNAs in the horse genome. This process generates a table where the number of aligned reads for each microRNA are counted for each sample. My goal was to model a relationship between microRNA expression level and time since infection using multi-linear regression.
 
 <style>
 .column-left{
@@ -69,7 +69,7 @@ My group are looking to find microRNAs that are predictive of viral infection. S
 I began with two tables, one a count matrix for each microRNA and the other a table containing metadata. 
 </br>
 </br>
-Just be looking at these tables, there are some challenging apsects to this data.
+Just be looking at these tables, there are some challenging aspects to this data.
 </br>
 * 800+ microRNAs
 </br>
@@ -80,7 +80,6 @@ Just be looking at these tables, there are some challenging apsects to this data
 * High dynamic range of counts 
 </div>
 <div class="column-center">
-Snippet of microRNA counts
 ```{r counts_table, out.width='100%', echo = FALSE}
 knitr::kable(head(microRNA_counts[1:7], n =6), format = "html") %>% 
   kable_styling("striped", full_width = FALSE)
@@ -88,7 +87,6 @@ knitr::kable(head(microRNA_counts[1:7], n =6), format = "html") %>%
 ```
 </div>
 <div class="column-right">
-Snippet of metadata
 ```{r metadata_table, out.width = '100%', echo = FALSE}
 
 knitr::kable(head(redlands_horse_metadata, n = 6 ), format = "html") %>% 
@@ -106,7 +104,7 @@ lib_size <- microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
   left_join(redlands_horse_metadata_long, by = "sample") %>% 
   rename(library = sample) %>% 
-  mutate(library = sub("s","", library)) %>% 
+  mutate(library = sub("s","", library)) %>%
   mutate(counts_million = counts/1000000) %>% 
   group_by(library) %>% 
   summarise(counts_sum = sum(counts_million))
@@ -116,9 +114,8 @@ median <- lib_size %>%
   summarise(median = median(counts_sum))
 
 ```
-## Data clean up
-Plotting the total counts for each sample or library we see that they vary considerably around the median for this experiment (`r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalise counts by library size so that sample 11 for example doesn't loose too many microRNAs because the library wasn't as high yeilding as the others. 
-```{r plotting library size, out.width = '60%', fig.align = 'center'}
+Plotting the total counts for each sample or library we see that they vary considerably around the median for this experiment (`r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalize counts by library size so that sample 11 for example, doesn't loose too many microRNAs because the library wasn't as high yielding as the others. 
+```{r plotting library size, out.width = '50%', fig.align = 'center'}
 
 counts_to_plot <- microRNA_counts %>%
   gather(sample, counts, -gene) %>% 
@@ -142,10 +139,10 @@ ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = ani
         title = element_text(size = 14, face = "bold"))
 
 ```
+We can convert the raw counts to counts per million (CPM) using the `edgeR` package after removing sample 6. Then we filter the lowly expressed microRNAs. The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this data set I kept microRNAs with less than 5 cpm in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples. Shown here is a density plot of log transformed counts before and after filtering, where the red dashed line represents the 5 cpm cut off chosen for this dataset. log-cpm is used to normalize the increasing variance with increasing count size. 
 
-We can convert the raw counts to counts per million (CPM) using the `edgeR` package after removing sample 6. Then we filter the lowly expressed microRNAs,  The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this dataset I kept microRNAs with less than 5 cpm in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples. Shown here is a density plot of log transformed counts before and after filtering, where the red dahsed line represents the 5 cpm cut off chosen for this dataset. 
+```{r filtering out lowly expressed genes, fig.align = 'center',fig.width = 8, fig.height = 5, out.width='60%'}
 
-```{r filtering out lowly expressed genes, out.width = '60%', fig.align = 'center'}
 #creating a DGEList with counts per million after removing s6
 microRNA_counts_s6 <- microRNA_counts %>% 
   select(-s6)
@@ -178,21 +175,9 @@ counts_cpm <- microRNA_counts_s6 %>%
 
 min_count <- 10/median
 
-plot_raw <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
-  geom_density() +
-  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") +
-  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
-  labs(title = "Unfiltered microRNAs",
-       x = "log-cpm") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 14, face = "bold"),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14, face = "bold"),
-        title = element_text(size = 14, face = "bold"),
-        plot.margin = margin(6, 0, 6, 0))
 
 # filtering lowly expressed genes
-design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata)
+design_matrix <- model.matrix(~ condition + animal, data = redlands_horse_metadata_s6)
 
 gene_filter <- filterByExpr(horse_counts, min.count = 6, min.total.count = 80, design = design_matrix)
 
@@ -211,10 +196,26 @@ filtered_cpm <- filtered_cpm_long %>%
   mutate(library = sub("s","", library)) %>% 
   mutate(log_filtered_cpm = log(cpm))
 
-plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
+# Plotting
+
+plot_unfiltered <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
   geom_density() +
   geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") +
   scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  labs(title = "Unfiltered microRNAs",
+       x = "log-cpm",
+       y = "density") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14, face = "bold"),
+        title = element_text(size = 14, face = "bold"),
+        plot.margin = margin(6, 2, 6, 2))
+
+
+plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
+  geom_density() +
+  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") + scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Filtered microRNAs",
        x = "log-cpm",
        y = "") +
@@ -227,25 +228,34 @@ plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)
 
 
 plots <- plot_grid(
-  plot_raw + theme(legend.position="none"),
+  plot_unfiltered + theme(legend.position="none"),
   plot_filtered + theme(legend.position="none"),
   hjust = -1,
   nrow = 1
 )
 
 legend <- get_legend(
-  plot_raw + theme(legend.box.margin = margin(0, 0, 0, 6))
+  plot_unfiltered + theme(legend.box.margin = margin(0, 0, 0, 6))
 )
 
 plot_grid(plots, legend, rel_widths = c(3, .4))
 
 ```
+We are left with `r nrow(horse_filtered$genes)` from the original `r nrow(horse_counts$genes)` and now need to perform normalization. It is assumed that all samples should have a similar range and distribution of expression values. However, during the sample preparation or sequencing process, external factors that are not of biological interest can affect the expression of individual samples. Normalization is required to ensure that the expression distributions of each sample are similar across the entire experiment. edge R employs the Trimmed Means of M values (TMM) in which highly expressed genes and those that have a large variation of expression are excluded, whereupon a weighted average of the subset of genes is used to calculate a normalization factor shown in the table below. 
 
-We are left with `r nrow(horse_filtered$genes)` from the original `r nrow(horse_counts$genes)` and now need to perform normalisation. It is assumed that all samples should have a similar range and distribution of expression values. However, during the sample preparation or sequencing process, external factors that are not of biological interest can affect the expression of individual samples. Normalisation is required to ensure that the expression distributions of each sample are similar across the entire experiment. edgeR employs the Trimmed Means of M values (TMM) in which highly expressed genes and those that have a large variation of expression are excluded, whereupon a weighted average of the subset of genes is used to calculate a normalization factor.
-
-```{r TMM normalisation, out.width = '70%', fig.align = 'center'}
+```{r TMM normalisation, result = 'hide'}
 
 horse_norm <- calcNormFactors(horse_filtered, method = "TMM")
+
+# Table of norm factors
+norm_factors <- horse_norm$samples %>% 
+  select(norm.factors, sample) %>% 
+  rename(library = sample) %>% 
+  mutate(library = sub("s","", library)) %>%
+  mutate(library = as.numeric(library)) %>% 
+  mutate(norm.factors = round(norm.factors, 2)) %>% 
+  spread(library, norm.factors)
+  
 
 norm_cpm_long <- cpm(horse_norm) %>% 
   as.tibble() %>%
@@ -256,31 +266,112 @@ norm_cpm <- norm_cpm_long %>%
   left_join(cpm_long) %>% 
   left_join(redlands_horse_metadata_s6_long) %>%
   rename(library = sample) %>% 
-  mutate(library = sub("s","", library)) %>% 
+  mutate(library = sub("s","", library)) %>%
+  mutate(library = as.numeric(library)) %>% 
   mutate(log_cpm = log(cpm)) %>% 
   mutate(log_norm_cpm = log(norm_cpm))
 
-plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library)) +
+plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library, group = library, fill = library)) +
   geom_boxplot() +
-  labs(title = "Unnormalised",
-       y = "log-cpm")
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 14, face = "bold"),
-        title = element_text(size = 14, face = "bold"))
+  scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  scale_fill_gradient(low = "blue", high = "red") +
+  labs(title = "Unormalized",
+       y = "log-cpm") +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12, face = "bold"),
+        title = element_text(size = 10, face = "bold"),
+        legend.position = "none")
 
-plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library)) +
+plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library, group = library, fill = library)) +
   geom_boxplot() +
-  labs(title = "Normalised",
-       y = "log-cpm")
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 14, face = "bold"),
-        title = element_text(size = 14, face = "bold"))
+  scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  scale_fill_gradient(low = "blue", high = "red") +
+  labs(title = "Normalized",
+       y = "log-cpm") +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12, face = "bold"),
+        title = element_text(size = 10, face = "bold"),
+        legend.position = "none")
+
+
+```
+
+```{r norm_factors_table, out.width='60%', fig.align = 'center', echo = FALSE}
+
+knitr::kable(norm_factors, format = "html") %>% 
+  kable_styling("striped", full_width = FALSE)
+
+```
+
+
+```{r Plotting normalisation, fig.align = 'center', fig.height = 3, fig.width = 7, out.width='80%'}
 
 plot_grid(plot_unnorm, plot_norm)
 
 ```
+We can now look at expression of individual genes in our libraries.  In genome-wide statistical analysis We can use the extensive between gene comparisons by generalized linear regression to provide a reliable inference of expression. However count measurements are heteroscedastic, i.e. the variance depends on the mean abundance. This can be modeled using the negative binomial distribution. In `voom` we model the mean-variance trend of the log-cpm values at the individual observation level. Voom stands for "variance modeling at the observational level". Note the flat line, idicatiing high biological variation in this dataset.
+```{r voom transformation, fig.height = 3, fig.width = 4}
+horse_voom <- voom(horse_norm, plot = T, design = design_matrix)
 
-EdgeR uses the negative binomial distribution to deal with count variability when performing multi linear regression. But forst let's do some quality control by performing principle component analysis.  
+```
+
+The the `voom` weights calculated by the distance from the red curve feed into`limma`. It can be seen from the Final model plot below that the variance is no longer dependent on the mean expression level thus can be modelled by `lmFit` function using `~ day + animal`. Unfortunately many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of any microRNAs. 
+
+```{r limma modeling, fig.height = 3, fig.width = 4}
+
+metadata_numeric <- redlands_horse_metadata %>% 
+  filter(sample != "s6") %>%
+  mutate(day = sub("d","", condition)) %>% 
+  select(-condition) %>% 
+  mutate(day = as.numeric(day))
+
+design_matrix_day <- model.matrix(~ day + animal, data = metadata_numeric)
+
+vfit <- lmFit(horse_voom, design_matrix_day)
+
+efit <- eBayes(vfit)
+
+plot_final <- plotSA(efit, main="Final model: Mean-variance trend")
+
+coeff <- topTable(efit, number = 200) %>% 
+  as.tibble() %>% 
+  select(gene, day, adj.P.Val) %>% 
+  mutate(signif = -log10(adj.P.Val))
+ 
+ggplot(coeff, aes(x= ad))
+
+```
+Now that we have gene expression levels from our voom transformation, we can perform a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different loactions along the dominant principle component (PC1), suggesting that oour biological replicates hold a greater source of variation than conditions.     
+```{r PCA plotting, out.width='40%', fig.align = 'center', echo = FALSE}
+#spread and convert to a matrix for PCA analysis 
+microRNA_expn <- horse_voom$E %>% 
+  as.tibble %>%
+  bind_cols(as.tibble(horse_voom$genes)) %>% 
+  gather(sample, expression, -gene) %>% 
+  left_join(redlands_horse_metadata, by = "sample") 
+
+scaled_microRNAs <- microRNA_expn %>%
+  spread(gene, expression) %>%
+  select(-animal, -condition) %>% 
+  column_to_rownames("sample") %>% 
+  scale()
+
+pca_microRNAs <- prcomp(scaled_microRNAs)
+
+pca_microRNAs$x %>% 
+  as_tibble(rownames = "sample") %>%
+  gather(PC, expression, -sample) %>% 
+  left_join(redlands_horse_metadata, by = "sample") %>%
+  spread(PC, expression) %>% 
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_text(aes(label = condition, color = animal), size = 8)+
+  labs(title = "PCA plot") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
+```
+
+
 
 
 # My Digital Toolbox
