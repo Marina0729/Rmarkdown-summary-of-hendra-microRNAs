@@ -341,7 +341,7 @@ horse_voom <- voom(horse_norm, plot = T, design = design_matrix)
 
 
 
-The the `voom` weights calculated by the distance from the red curve feed into`limma` so that the variance is no longer dependent on the mean expression level. Here I used the `lmFit` function with model `~ day + animal`. This plot highlights microRNAs with a p-value <0.05 and coefficient more than 0.15 units away from zero. Many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of most microRNAs. There were however some of interest whcih have been plotted against day pot infection below. 
+The the `voom` weights calculated by the distance from the red curve feed into`limma` so that the variance is no longer dependent on the mean expression level. Here I used the `lmFit` function with model `~ day + animal`. This plot highlights microRNAs with a p-value <0.05 and coefficient more than 0.15 units away from zero. Many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of most microRNAs. There were however some of interest which have been plotted against day pot infection below. 
 
 ```{r limma modeling using numeric day, out.width = '60%'}
 metadata_numeric <- redlands_horse_metadata %>% 
@@ -469,7 +469,7 @@ I've used tidyverse to bring tabular data outputs from analysis into 'tidy' tabl
 
 # Favourite tool
 
-I've really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particulary love the filter function!
+I've really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particularly love the filter function!
 
 
 # My time went ...

@@ -1201,7 +1201,7 @@ d0
 </div>
 <div id="multi-linear-regression" class="section level1">
 <h1>Multi-linear regression</h1>
-<p>The the <code>voom</code> weights calculated by the distance from the red curve feed into<code>limma</code> so that the variance is no longer dependent on the mean expression level. Here I used the <code>lmFit</code> function with model <code>~ day + animal</code>. This plot highlights microRNAs with a p-value &lt;0.05 and coefficient more than 0.15 units away from zero. Many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of most microRNAs. There were however some of interest whcih have been plotted against day pot infection below.</p>
+<p>The the <code>voom</code> weights calculated by the distance from the red curve feed into<code>limma</code> so that the variance is no longer dependent on the mean expression level. Here I used the <code>lmFit</code> function with model <code>~ day + animal</code>. This plot highlights microRNAs with a p-value &lt;0.05 and coefficient more than 0.15 units away from zero. Many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of most microRNAs. There were however some of interest which have been plotted against day pot infection below.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" title="1">metadata_numeric &lt;-<span class="st"> </span>redlands_horse_metadata <span class="op">%&gt;%</span><span class="st"> </span></a>
 <a class="sourceLine" id="cb6-2" title="2"><span class="st">  </span><span class="kw">filter</span>(sample <span class="op">!=</span><span class="st"> &quot;s6&quot;</span>) <span class="op">%&gt;%</span></a>
 <a class="sourceLine" id="cb6-3" title="3"><span class="st">  </span><span class="kw">mutate</span>(<span class="dt">day =</span> <span class="kw">sub</span>(<span class="st">&quot;d&quot;</span>,<span class="st">&quot;&quot;</span>, condition)) <span class="op">%&gt;%</span><span class="st"> </span></a>
@@ -1285,7 +1285,7 @@ d0
 </div>
 <div id="favourite-tool" class="section level1">
 <h1>Favourite tool</h1>
-<p>I’ve really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particulary love the filter function!</p>
+<p>I’ve really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particularly love the filter function!</p>
 </div>
 <div id="my-time-went" class="section level1">
 <h1>My time went …</h1>
