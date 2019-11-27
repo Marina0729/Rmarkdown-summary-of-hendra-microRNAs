@@ -215,7 +215,8 @@ plot_unfiltered <- ggplot(counts_cpm, aes(x = log_cpm, color = library)) +
 
 plot_filtered <- ggplot(filtered_cpm, aes(x = log_filtered_cpm, color = library)) +
   geom_density() +
-  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") + scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
+  geom_vline(xintercept = log(5.53), linetype="dashed", color = "red") + 
+  scale_color_discrete(limits = c(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
   labs(title = "Filtered microRNAs",
        x = "log-cpm",
        y = "") +
@@ -315,9 +316,9 @@ horse_voom <- voom(horse_norm, plot = T, design = design_matrix)
 
 ```
 
-The the `voom` weights calculated by the distance from the red curve feed into`limma`. It can be seen from the Final model plot below that the variance is no longer dependent on the mean expression level thus can be modelled by `lmFit` function using `~ day + animal`. Unfortunately many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of any microRNAs. 
+The the `voom` weights calculated by the distance from the red curve feed into`limma` so that the variance is no longer dependent on the mean expression level. Here I used the `lmFit` function with model `~ day + animal`. Unfortunately many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of any microRNAs. 
 
-```{r limma modeling, fig.height = 3, fig.width = 4}
+```{r limma modeling}
 
 metadata_numeric <- redlands_horse_metadata %>% 
   filter(sample != "s6") %>%
@@ -331,17 +332,59 @@ vfit <- lmFit(horse_voom, design_matrix_day)
 
 efit <- eBayes(vfit)
 
-plot_final <- plotSA(efit, main="Final model: Mean-variance trend")
-
-coeff <- topTable(efit, number = 200) %>% 
+coeff <- topTable(efit, number = 231) %>% 
   as.tibble() %>% 
   select(gene, day, adj.P.Val) %>% 
   mutate(signif = -log10(adj.P.Val))
+
+highlight <- coeff %>% 
+  filter(adj.P.Val <= 0.05) %>% 
+  filter(day >=0.15 | day <=-0.15)
+  
  
-ggplot(coeff, aes(x= ad))
+ggplot(coeff, aes(x = day, y = signif)) +
+  geom_point(size = 0.5) +
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", color = "red") +
+  geom_vline(xintercept = 0.15, linetype = "dashed", color = "blue") +
+  geom_vline(xintercept = -0.15, linetype = "dashed", color = "blue") +
+  geom_text(data = highlight, aes(x = day, y = signif, label = gene), 
+            hjust = 0.5, vjust = -0.5, size = 3, check_overlap=TRUE) +
+  coord_cartesian(xlim = c(-1, 1), ylim = c(0, 4)) +
+  labs(
+    x = "coefficient of `~ day + animal' model",
+    y = "-log10(adjusted P value)", 
+    title = "Identifying microRNAs that respond to infection"
+  )
+
+plot_gene <- function(gene_name) {
+  horse_voom$targets %>% 
+    as_tibble %>% 
+    mutate(expn = horse_voom$E[horse_voom$genes$gene == gene_name, ]) %>% 
+    ggplot(aes(x = day, y = expn, colour = animal)) +
+    geom_point() +
+    labs(title = gene_name)
+}
+
+
+plot_gene("5_64196")
+plot_gene("eca-miR-381")
+plot_gene("eca-miR-127")
+plot_gene("eca-miR-379")
+plot_gene("eca-miR-143")
+plot_gene("18_31552")
+plot_gene("20_38845")
+plot_gene("eca-miR-215")
+plot_gene("8_76957")
+plot_gene("eca-miR-146a") # negative regulator of inflammation 
+plot_gene("eca-miR-223") #negative reulator of innate immunty 
+plot_gene("eca-miR-10a")
+plot_gene("eca-miR-21")
+plot_gene("eca-miR-24")
+plot_gene("eca-miR-145")
+plot_gene("20_38845")
 
 ```
-Now that we have gene expression levels from our voom transformation, we can perform a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different loactions along the dominant principle component (PC1), suggesting that oour biological replicates hold a greater source of variation than conditions.     
+Using gene expression levels from our voom transformation, we can perform a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different loactions along the dominant principle component (PC1), suggesting that oour biological replicates hold a greater source of variation than conditions.     
 ```{r PCA plotting, out.width='40%', fig.align = 'center', echo = FALSE}
 #spread and convert to a matrix for PCA analysis 
 microRNA_expn <- horse_voom$E %>% 
@@ -385,7 +428,8 @@ You can use all the usual R markdown features in writing a project summary, incl
 
 ![](resources/img/tidyverse.png){width=100px}
 ![](resources/img/edgeR.png){width=270px}
-![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){.pull-right width=100px}
+![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){width=85px}
+
 ## Favourite tool (optional)
 
 Is there a tool/package/function in particular that you've enjoyed using? Give it a special shout out here.
