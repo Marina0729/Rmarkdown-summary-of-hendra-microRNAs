@@ -1,6 +1,6 @@
 ---
 title: Mining the transcriptome for biomarkers of infection 
-subtitle: A play with microRNA count data 
+subtitle: A play with RNA-seq count data 
 author:  Marina Alexander
 affiliation: Health & Biosecurity| Managing invasive species and Disease
 photo: resources/img/Measles.jpg
@@ -460,21 +460,22 @@ pca_microRNAs$x %>%
 
 # My Digital Toolbox
 
-I've used tidyverse to bring tabular data outputs from analysis into 'tidy' tables in which each variable forms a column, each observation forms a row and each cell holds a value. This can then feed into ggplot2 to make flexible visualizations. I have also used the RNA-seq packages, edgeR, limma and voom. All these were totally new to me! 
+I've used tidyverse to bring tabular data outputs from analysis into 'tidy' tables in which each variable forms a column, each observation forms a row and each cell holds a value. This can then feed into ggplot2 to make flexible visualizations. I have also used the RNA-seq packages, edgeR, limma and voom then the publishing packages rmarkdown and knitr. All these were totally new to me! 
 
 
 ![](resources/img/tidyverse.png){width=100px}
 ![](resources/img/edgeR.png){width=270px}
+![](resources/img/hex-rmarkdown.png){width=90px}
 ![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){width=85px}
 
 # Favourite tool
 
-I've really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particularly love the filter function!
+I've really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particularly love the filter function! Also rmarkdown, I really want to write papers using rmarkdown.
 
 
 # My time went ...
 
-In the early weeks, learning to use a programming language was really hard. There was so many functions to remember and things moved very slowly. Once I could gather and spread and make plots of my data things moved much more quickly and it became addictive!
+In the early weeks, learning to use a programming language was really hard. There were so many functions to remember and things moved very slowly. Once I could gather and spread and make plots of my data things moved much more quickly and it became addictive!
 
 # Next steps
 
