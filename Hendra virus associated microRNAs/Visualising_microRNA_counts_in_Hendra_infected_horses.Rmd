@@ -5,7 +5,7 @@ author:  Marina Alexander
 affiliation: Health & Biosecurity| Managing invasive species and Disease
 photo: resources/img/Measles.jpg
 
-short_title: Optional short title
+short_title: Hendra microRNAs
 
 output: 
   DSreport::project_summary:
@@ -16,13 +16,13 @@ output:
 .libPaths(c("C:/Users/ale097/Data School/Packages"))
 #Load libraries
 library(tidyverse)
-library(gapminder)
 library(kableExtra)
 library(knitr)
 library(edgeR)
 library(limma)
 library(cowplot)
 library(rlang)
+library(wesanderson)
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
@@ -114,6 +114,12 @@ median <- lib_size %>%
   summarise(median = median(counts_sum))
 
 ```
+
+
+# Plotting the total counts
+
+
+
 Plotting the total counts for each sample or library we see that they vary considerably around the median for this experiment (`r median(lib_size$counts_sum)` million counts as shown by the red dashed line). To conduct a filtering step we'll need to normalize counts by library size so that sample 11 for example, doesn't loose too many microRNAs because the library wasn't as high yielding as the others. 
 ```{r plotting library size, out.width = '50%', fig.align = 'center'}
 
@@ -139,6 +145,11 @@ ggplot(counts_to_plot, aes(y = counts_sum, x = library, color = day, shape = ani
         title = element_text(size = 14, face = "bold"))
 
 ```
+
+
+# Filtering out the lowly expressed genes
+
+
 We can convert the raw counts to counts per million (CPM) using the `edgeR` package after removing sample 6. Then we filter the lowly expressed microRNAs. The `filterByExpr` function used here removes genes based on sequencing depth and experimental design. For this data set I kept microRNAs with less than 5 cpm in at least 3 samples because we have 3 animals or biological replicates and also removed genes with less than 80 cpm across all samples. Shown here is a density plot of log transformed counts before and after filtering, where the red dashed line represents the 5 cpm cut off chosen for this dataset. log-cpm is used to normalize the increasing variance with increasing count size. 
 
 ```{r filtering out lowly expressed genes, fig.align = 'center',fig.width = 8, fig.height = 5, out.width='60%'}
@@ -242,6 +253,11 @@ legend <- get_legend(
 plot_grid(plots, legend, rel_widths = c(3, .4))
 
 ```
+
+
+# Trimmed Means of M values normalization
+
+
 We are left with `r nrow(horse_filtered$genes)` from the original `r nrow(horse_counts$genes)` and now need to perform normalization. It is assumed that all samples should have a similar range and distribution of expression values. However, during the sample preparation or sequencing process, external factors that are not of biological interest can affect the expression of individual samples. Normalization is required to ensure that the expression distributions of each sample are similar across the entire experiment. edge R employs the Trimmed Means of M values (TMM) in which highly expressed genes and those that have a large variation of expression are excluded, whereupon a weighted average of the subset of genes is used to calculate a normalization factor shown in the table below. 
 
 ```{r TMM normalisation, result = 'hide'}
@@ -272,21 +288,20 @@ norm_cpm <- norm_cpm_long %>%
   mutate(log_cpm = log(cpm)) %>% 
   mutate(log_norm_cpm = log(norm_cpm))
 
-plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library, group = library, fill = library)) +
+
+plot_unnorm <- ggplot(norm_cpm, aes(y = log_cpm, x = library, group = library)) +
   geom_boxplot() +
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
-  scale_fill_gradient(low = "blue", high = "red") +
-  labs(title = "Unormalized",
+  labs(title = "Unnormalized",
        y = "log-cpm") +
   theme(axis.text = element_text(size = 10),
         axis.title = element_text(size = 12, face = "bold"),
         title = element_text(size = 10, face = "bold"),
         legend.position = "none")
 
-plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library, group = library, fill = library)) +
+plot_norm <- ggplot(norm_cpm, aes(y = log_norm_cpm, x = library, group = library)) +
   geom_boxplot() +
   scale_x_discrete(limits = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) +
-  scale_fill_gradient(low = "blue", high = "red") +
   labs(title = "Normalized",
        y = "log-cpm") +
   theme(axis.text = element_text(size = 10),
@@ -310,27 +325,48 @@ knitr::kable(norm_factors, format = "html") %>%
 plot_grid(plot_unnorm, plot_norm)
 
 ```
-We can now look at expression of individual genes in our libraries.  In genome-wide statistical analysis We can use the extensive between gene comparisons by generalized linear regression to provide a reliable inference of expression. However count measurements are heteroscedastic, i.e. the variance depends on the mean abundance. This can be modeled using the negative binomial distribution. In `voom` we model the mean-variance trend of the log-cpm values at the individual observation level. Voom stands for "variance modeling at the observational level". Note the flat line, idicatiing high biological variation in this dataset.
+
+
+# Voom transformation to normalize heteroscedastic counts
+
+ 
+We can now look at expression of individual genes in our libraries.  In genome-wide statistical analysis We can use the extensive between gene comparisons by generalized linear regression to provide a reliable inference of expression. However count measurements are heteroscedastic, i.e. the variance depends on the mean abundance. This can be modeled using the negative binomial distribution. In `voom` we model the mean-variance trend of the log-cpm values at the individual observation level. Voom stands for "variance modeling at the observational level". Note the flat line, indicating high biological variation in this dataset.
 ```{r voom transformation, fig.height = 3, fig.width = 4}
 horse_voom <- voom(horse_norm, plot = T, design = design_matrix)
 
 ```
 
-The the `voom` weights calculated by the distance from the red curve feed into`limma` so that the variance is no longer dependent on the mean expression level. Here I used the `lmFit` function with model `~ day + animal`. Unfortunately many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of any microRNAs. 
 
-```{r limma modeling}
+# Multi-linear regression  
 
+
+
+The the `voom` weights calculated by the distance from the red curve feed into`limma` so that the variance is no longer dependent on the mean expression level. Here I used the `lmFit` function with model `~ day + animal`. This plot highlights microRNAs with a p-value <0.05 and coefficient more than 0.15 units away from zero. Many of the significant coefficients are close to zero meaning that the day post infection has little impact on expression of most microRNAs. There were however some of interest whcih have been plotted against day pot infection below. 
+
+```{r limma modeling using numeric day, out.width = '60%'}
 metadata_numeric <- redlands_horse_metadata %>% 
   filter(sample != "s6") %>%
   mutate(day = sub("d","", condition)) %>% 
   select(-condition) %>% 
   mutate(day = as.numeric(day))
 
+horse_counts_day <- DGEList(counts = microRNA_counts_s6[, -1], genes = microRNA_counts_s6[, 1], samples = metadata_numeric)
+
 design_matrix_day <- model.matrix(~ day + animal, data = metadata_numeric)
 
-vfit <- lmFit(horse_voom, design_matrix_day)
+gene_filter_day <- filterByExpr(horse_counts_day, min.count = 6, min.total.count = 80, design = design_matrix_day)
+
+horse_filtered_day <- horse_counts_day[gene_filter_day, , keep.lib.sizes = FALSE]
+
+horse_norm_day <- calcNormFactors(horse_filtered_day)
+
+horse_voom_day <- voom(horse_norm_day, design = design_matrix_day)
+
+vfit <- lmFit(horse_voom_day, design_matrix_day)
 
 efit <- eBayes(vfit)
+
+# plotting the significant genes
 
 coeff <- topTable(efit, number = 231) %>% 
   as.tibble() %>% 
@@ -343,49 +379,55 @@ highlight <- coeff %>%
   
  
 ggplot(coeff, aes(x = day, y = signif)) +
-  geom_point(size = 0.5) +
+  geom_point(size = 1) +
   geom_hline(yintercept = -log10(0.05), linetype="dashed", color = "red") +
   geom_vline(xintercept = 0.15, linetype = "dashed", color = "blue") +
   geom_vline(xintercept = -0.15, linetype = "dashed", color = "blue") +
   geom_text(data = highlight, aes(x = day, y = signif, label = gene), 
-            hjust = 0.5, vjust = -0.5, size = 3, check_overlap=TRUE) +
+            hjust = 0.5, vjust = -0.5, size = 5, check_overlap=TRUE) +
   coord_cartesian(xlim = c(-1, 1), ylim = c(0, 4)) +
   labs(
     x = "coefficient of `~ day + animal' model",
     y = "-log10(adjusted P value)", 
-    title = "Identifying microRNAs that respond to infection"
-  )
-
-plot_gene <- function(gene_name) {
-  horse_voom$targets %>% 
-    as_tibble %>% 
-    mutate(expn = horse_voom$E[horse_voom$genes$gene == gene_name, ]) %>% 
-    ggplot(aes(x = day, y = expn, colour = animal)) +
-    geom_point() +
-    labs(title = gene_name)
-}
-
-
-plot_gene("5_64196")
-plot_gene("eca-miR-381")
-plot_gene("eca-miR-127")
-plot_gene("eca-miR-379")
-plot_gene("eca-miR-143")
-plot_gene("18_31552")
-plot_gene("20_38845")
-plot_gene("eca-miR-215")
-plot_gene("8_76957")
-plot_gene("eca-miR-146a") # negative regulator of inflammation 
-plot_gene("eca-miR-223") #negative reulator of innate immunty 
-plot_gene("eca-miR-10a")
-plot_gene("eca-miR-21")
-plot_gene("eca-miR-24")
-plot_gene("eca-miR-145")
-plot_gene("20_38845")
+    title = "Identifying microRNAs that respond to infection") +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
 
 ```
-Using gene expression levels from our voom transformation, we can perform a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different loactions along the dominant principle component (PC1), suggesting that oour biological replicates hold a greater source of variation than conditions.     
-```{r PCA plotting, out.width='40%', fig.align = 'center', echo = FALSE}
+
+
+```{r plotting significant microRNAs, out.width = '60%'}
+
+microRNA_expn_day <- horse_voom$E %>% 
+  as.tibble %>%
+  bind_cols(as.tibble(horse_voom$genes)) %>% 
+  gather(sample, expression, -gene) %>% 
+  left_join(metadata_numeric, by = "sample") %>% 
+  filter(gene == "eca-miR-143"| gene == "eca-miR-215"|gene =="eca-miR-10b"|gene == "6_70095"|gene =="31_60371"|gene == "24_47765"|gene == "20_38845"|gene =="8_76957")
+
+ggplot(microRNA_expn_day, aes(x = day, y = expression, color = animal, group = gene)) +
+  geom_point() +
+  geom_smooth(method = "glm") +
+  facet_wrap(~gene, ncol = 4) +
+  labs(title = "Plotting individual microRNAs",
+       x = "day post Hendra infection",
+       y = "microRNA expression")+
+    theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12, face = "bold"),
+        title = element_text(size = 14, face = "bold"))
+
+
+```
+
+
+# Principle Components Analysis (PCA) for QC
+
+
+
+Using gene expression levels from our voom transformation, we can perform a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different locations along the dominant principle component (PC1), suggesting that our biological replicates hold a greater source of variation than conditions. 
+
+```{r PCA plotting, out.width='60%', fig.align = 'center', echo = FALSE}
 #spread and convert to a matrix for PCA analysis 
 microRNA_expn <- horse_voom$E %>% 
   as.tibble %>%
@@ -407,52 +449,37 @@ pca_microRNAs$x %>%
   left_join(redlands_horse_metadata, by = "sample") %>%
   spread(PC, expression) %>% 
   ggplot(aes(x = PC1, y = PC2)) +
-  geom_text(aes(label = condition, color = animal), size = 8)+
-  labs(title = "PCA plot") +
+  geom_text(aes(label = condition, color = animal), size = 6) +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 16, face = "bold"),
-        title = element_text(size = 14, face = "bold"))
+        title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 14)) +
+  labs(title = "Principle Component Analysis")
 ```
-
-
 
 
 # My Digital Toolbox
 
-What digital tools have you been using in your project? Which ones have you learned since starting 
-Data School?
+I've used tidyverse to bring tabular data outputs from analysis into 'tidy' tables in which each variable forms a column, each observation forms a row and each cell holds a value. This can then feed into ggplot2 to make flexible visualizations. I have also used the RNA-seq packages, edgeR, limma and voom. All these were totally new to me! 
 
-You can use all the usual R markdown features in writing a project summary, including lists:
-
-* R - dplyr, tidyverse, ggplot,
 
 ![](resources/img/tidyverse.png){width=100px}
 ![](resources/img/edgeR.png){width=270px}
 ![](https://raw.githubusercontent.com/tidyverse/ggplot2/master/man/figures/logo.png){width=85px}
 
-## Favourite tool (optional)
+# Favourite tool
 
-Is there a tool/package/function in particular that you've enjoyed using? Give it a special shout out here.
+I've really enjoyed tidyverse, such a straightforward and standardized way of looking at data, particulary love the filter function!
 
-
-
-No prizes for guessing mine:
 
 # My time went ...
 
-What parts of the project took the most time and effort? Were there any surprising challenges you
-encountered, and how did you solve them?
+In the early weeks, learning to use a programming language was really hard. There was so many functions to remember and things moved very slowly. Once I could gather and spread and make plots of my data things moved much more quickly and it became addictive!
 
 # Next steps
 
-What further steps do you wish your project could take? Or are there any new digital skills that you
-are keen to develop as a result of your involvement in the Data School?
+I would like to try the same analysis pipeline used here with different data sets. Going forward I'm eager to generate my own data, beginning with FAIR data principles so that my work is findable,  accessible, interoperable and reproducible! 
 
 # My Data School Experience
 
-This poster is mostly about your synthesis project. However we would also like to hear about other
-parts of your Data School experience. What aspects of the program did you really enjoy? How have you
-been applying the skills you have learned in your daily work? Have you been able to transfer this 
-knowledge to your team members? Concrete examples demonstrating this would be useful here
-(meetings/talks/collaborations/new roles). Any descriptions of the personal impact the program has 
-had are welcome here as well!
+I'm so thankful to be given such a great introduction to programming, data management and app development. I also appreciated the in-depth stats lessons. Already I have been collecting data in a tidy way to save time on analysis and plotting the raw data to understand sources of variation which feeds into improved experimental design. On a personal note I have really enjoyed the feeling of doors opening. Excited to feel connected to a community of data scientists at CSIRO and beyond. 
