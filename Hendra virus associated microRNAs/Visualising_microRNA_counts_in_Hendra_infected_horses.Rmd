@@ -69,9 +69,9 @@ My group are looking to find microRNAs that are predictive of viral infection. S
 I began with two tables, one a count matrix for each microRNA and the other a table containing metadata, a snippet of each is shown here. 
 </br>
 </br>
-Just be looking at these tables, there are some challenging aspects to this data.
+Just by looking at these tables, there are some challenging aspects to this data.
 </br>
-* 800+ microRNAs
+* 800 microRNAs
 </br>
 * microRNAs with zero counts
 </br>
@@ -427,7 +427,7 @@ ggplot(microRNA_expn_day, aes(x = day, y = expression, color = animal, group = g
 
 Using gene expression levels from my voom transformation, I performed a principle component analysis to show similarities and dissimilarities between samples in an unsupervised manner. Ideally, samples would cluster well within the primary condition of interest, and any sample straying far from its group could be identified and followed up for sources of error or extra variation. Ideally, replicates should lie very close to one another. We see that microRNA expression in horse 3 day 0 (s11) is more affected by a source of variation than any other samples suggesting a technical problem. This sample was only sequenced to a depth of 0.5 million reads. It would be interesting to exclude this sample as an outlier and repeat differential expression analysis. A further concern is that horse 1 and 3 cluster in different locations along the dominant principle component (PC1), suggesting that our biological replicates hold a greater source of variation than conditions. 
 
-```{r PCA plotting, out.width='60%', fig.align = 'center', echo = FALSE}
+```{r PCA plotting, out.width='60%', fig.align = 'center'}
 #spread and convert to a matrix for PCA analysis 
 microRNA_expn <- horse_voom$E %>% 
   as.tibble %>%
